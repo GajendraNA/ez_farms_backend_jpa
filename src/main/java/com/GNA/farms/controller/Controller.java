@@ -4,11 +4,20 @@ import com.GNA.farms.dao.*;
 import com.GNA.farms.dto.*;
 
 import com.GNA.farms.model.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.Id;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -169,29 +178,78 @@ ResponseEntity.ok(exBuyer);
         }
 
 
-    @PostMapping("inventory")
-    public ResponseEntity<Inventory> createInventory(@RequestBody InventoryDto inventoryDto) {
-        Farmer farmer = farmerDao.findById(inventoryDto.getFarmer_id())
-                .orElseThrow(() -> new RuntimeException("Farmer not found"));
-        Items item = itemsDao.findById(inventoryDto.getItem_id())
-                .orElseThrow(() -> new RuntimeException("Item not found"));
+    @PostMapping("inventory/upload")
+    public String uploadTicket(@RequestParam("file") MultipartFile file, @RequestParam("data") String inventoryData) throws JsonProcessingException {
+        System.out.println("Hit inventory upload");
 
-        Inventory inventory = new Inventory();
-        inventory.setName(inventoryDto.getName());
-        inventory.setFarmer(farmer);
-        inventory.setItem(item);
-        inventory.setWeight(inventoryDto.getWeight());
-        inventory.setRemaining_weight(inventoryDto.getRemaining_weight());
-        inventory.setFinal_rate_per_kg(inventoryDto.getFinal_rate_per_kg());
+        System.out.println("Description: " + inventoryData);
+        System.out.println("Description: " + file.getOriginalFilename());
 
-        inventoryDao.save(inventory);
-        return ResponseEntity.ok(inventory);
+        ObjectMapper objectMapper = new ObjectMapper();
+        InventoryRequestDto inventoryRequestDtoDto = objectMapper.readValue(inventoryData, InventoryRequestDto.class);
+        System.out.println("Hit inventory upload");
+        String UPLOAD_DIRECTORY = new File("src/main/resources/static").getAbsolutePath();
+
+        File uploadDir = new File(UPLOAD_DIRECTORY);
+        if (!uploadDir.exists()) {
+            uploadDir.mkdirs();
+        }
+        try {
+            // Get the original filename
+            String originalImgname = file.getOriginalFilename();
+            // Define the path where the file will be saved
+            Path filePath = Paths.get(UPLOAD_DIRECTORY, originalImgname);
+            // Save the file
+            Files.write(filePath, file.getBytes());
+
+
+            System.out.println("Description: " + inventoryRequestDtoDto);
+            Farmer farmer = farmerDao.findById(inventoryRequestDtoDto.getFarmerId()).orElseThrow(() -> new RuntimeException("no user found"));
+            Items items = itemsDao.findById(inventoryRequestDtoDto.getItemId()).orElseThrow(() -> new RuntimeException("no item found"));
+
+            Inventory inventorySaved = new Inventory();
+            inventorySaved.setName(file.getOriginalFilename());
+            inventorySaved.setFarmer(farmer);
+            inventorySaved.setItem(items);
+            inventorySaved.setWeight(inventoryRequestDtoDto.getWeight());
+            inventorySaved.setRemaining_weight(inventoryRequestDtoDto.getRemaining_weight());
+            inventorySaved.setFinal_rate_per_kg(inventoryRequestDtoDto.getFinal_rate_per_kg());
+            inventoryDao.save(inventorySaved);
+
+            return "File uploaded successfully: " + originalImgname;
+        } catch (IOException e) {
+            // Handle the exception
+            e.printStackTrace();
+            return "File upload failed: " + e.getMessage();
+        }
     }
 
 
     @GetMapping("inventory")
     public ResponseEntity<List<InventoryDto>> getAllInventories() {
         List<Inventory> inventoryList = inventoryDao.findAll();
+        List<InventoryDto> inventoryDtoList = inventoryList.stream().map(inventory -> {
+            InventoryDto dto = new InventoryDto();
+            dto.setId(inventory.getId());
+            dto.setName(inventory.getName());
+            dto.setFarmer_id(inventory.getFarmer().getId());
+            dto.setItem_id(inventory.getItem().getId());
+            dto.setWeight(inventory.getWeight());
+            dto.setRemaining_weight(inventory.getRemaining_weight());
+            dto.setFinal_rate_per_kg(inventory.getFinal_rate_per_kg());
+            dto.setFarmer_name(inventory.getFarmer().getName());
+            dto.setItem_name(inventory.getItem().getName());
+            dto.setItem_description(inventory.getItem().getDescription());
+            dto.setItem_category(inventory.getItem().getCategory());
+            return dto;
+        }).collect(Collectors.toList());
+        System.out.println(inventoryDtoList);
+        return ResponseEntity.ok(inventoryDtoList);
+    }
+
+    @GetMapping("fInventory/{id}")
+    public ResponseEntity<List<InventoryDto>> getAllInventoriesByFarmerId(@PathVariable Long id){
+        List<Inventory> inventoryList = inventoryDao.findAllByFarmerId(id);
         List<InventoryDto> inventoryDtoList = inventoryList.stream().map(inventory -> {
             InventoryDto dto = new InventoryDto();
             dto.setId(inventory.getId());
@@ -285,6 +343,34 @@ ResponseEntity.ok(exBuyer);
             dto.setBuyer_id(order.getBuyer().getId());
             dto.setItem_id(order.getItems().getId());
             dto.setWeight(order.getWeight());
+            dto.setOrdered_date(order.getOrdered_date());
+            dto.setEst_delivery_date(order.getEst_delivery_date()); // Ensure getEst_delivery_date() returns non-null value
+            dto.setOrder_amount(order.getOrder_amount()); // Ensure getOrder_amount() returns non-null value
+            dto.setDiscount_applied(order.getDiscount_applied()); // Ensure getDiscount_applied() returns non-null value
+            dto.setAmount_pending(order.getAmount_pending()); // Ensure getAmount_pending() returns non-null value
+            dto.setFinal_amount(order.getFinal_amount()); // Ensure getFinal_amount() returns non-null value
+            dto.setStatus(order.getStatus()); // Ensure getStatus() returns non-null value
+            dto.setFarmer_name(order.getFarmer().getName());
+            dto.setInventory_name(order.getInventory().getName());
+            dto.setBuyer_name(order.getBuyer().getName());
+            dto.setItem_name(order.getItems().getName());
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(orderDtos);
+    }
+
+    @GetMapping("fOrders/{id}")
+    public ResponseEntity<List<OrderDto>> getAllOrdersByFarmerId(@PathVariable Long id){
+        List<Order> orders=orderDao.findAllByFarmerId(id);
+        List<OrderDto> orderDtos = orders.stream().map(order -> {
+            OrderDto dto = new OrderDto();
+            dto.setId(order.getId());
+            dto.setInventory_id(order.getInventory().getId());
+            dto.setFarmer_id(order.getFarmer().getId());
+            dto.setBuyer_id(order.getBuyer().getId());
+            dto.setItem_id(order.getItems().getId());
+            dto.setWeight(order.getWeight());
             dto.setOrdered_date(order.getOrdered_date()); // Ensure getOrdered_date() returns non-null value
             dto.setEst_delivery_date(order.getEst_delivery_date()); // Ensure getEst_delivery_date() returns non-null value
             dto.setOrder_amount(order.getOrder_amount()); // Ensure getOrder_amount() returns non-null value
@@ -300,6 +386,35 @@ ResponseEntity.ok(exBuyer);
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(orderDtos);
+
+    }
+    @GetMapping("bOrders/{id}")
+    public ResponseEntity<List<OrderDto>> getAllOrdersByBuyerId(@PathVariable Long id){
+        List<Order> orders=orderDao.findAllByBuyerId(id);
+        List<OrderDto> orderDtos = orders.stream().map(order -> {
+            OrderDto dto = new OrderDto();
+            dto.setId(order.getId());
+            dto.setInventory_id(order.getInventory().getId());
+            dto.setFarmer_id(order.getFarmer().getId());
+            dto.setBuyer_id(order.getBuyer().getId());
+            dto.setItem_id(order.getItems().getId());
+            dto.setWeight(order.getWeight());
+            dto.setOrdered_date(order.getOrdered_date()); // Ensure getOrdered_date() returns non-null value
+            dto.setEst_delivery_date(order.getEst_delivery_date()); // Ensure getEst_delivery_date() returns non-null value
+            dto.setOrder_amount(order.getOrder_amount()); // Ensure getOrder_amount() returns non-null value
+            dto.setDiscount_applied(order.getDiscount_applied()); // Ensure getDiscount_applied() returns non-null value
+            dto.setAmount_pending(order.getAmount_pending()); // Ensure getAmount_pending() returns non-null value
+            dto.setFinal_amount(order.getFinal_amount()); // Ensure getFinal_amount() returns non-null value
+            dto.setStatus(order.getStatus()); // Ensure getStatus() returns non-null value
+            dto.setFarmer_name(order.getFarmer().getName());
+            dto.setInventory_name(order.getInventory().getName());
+            dto.setBuyer_name(order.getBuyer().getName());
+            dto.setItem_name(order.getItems().getName());
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(orderDtos);
+
     }
 
     @PutMapping("orders/{id}")
@@ -342,6 +457,7 @@ ResponseEntity.ok(exBuyer);
         orderDao.deleteById(id);
         return ResponseEntity.ok(existingOrder);
     }
+
 
 
 
