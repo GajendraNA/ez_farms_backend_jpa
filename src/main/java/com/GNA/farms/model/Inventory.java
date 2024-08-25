@@ -25,9 +25,12 @@ public class Inventory {
     @JoinColumn(name = "farmer_id")
     private Farmer farmer;
 
-    @ManyToOne
-    @JoinColumn(name = "item_id")
-    private Items item;
+
+    private String itemName;
+
+    private String description;
+
+    private String category;
 
     private Double weight;
     private Double remaining_weight;
