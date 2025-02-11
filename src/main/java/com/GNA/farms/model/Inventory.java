@@ -24,6 +24,7 @@ public class Inventory {
     @ManyToOne
     @JoinColumn(name = "farmer_id")
     private Farmer farmer;
+
     private Double weight;
     private Double remaining_weight;
     private Double final_rate_per_kg;

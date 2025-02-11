@@ -2,12 +2,11 @@ package com.GNA.farms.controller;
 
 import com.GNA.farms.dao.*;
 import com.GNA.farms.dto.*;
-
 import com.GNA.farms.model.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.Id;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -51,53 +49,73 @@ public class Controller {
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
         return ResponseEntity.ok(farmer);
     }
+
     @PostMapping("/buyerLogin")
     public ResponseEntity<Buyer> verifyCustomer(@RequestBody LoginDto verificationDto) {
-        Buyer buyer = buyerDao.findByEmailAndPassword(verificationDto.getEmail(), verificationDto.getPassword())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
-        return ResponseEntity.ok(buyer);
+        if (!buyerDao.existsByEmail(verificationDto.getEmail())){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+        Buyer buyer = null;
+        try {
+            buyer = buyerDao.findByEmailAndPassword(verificationDto.getEmail(), verificationDto.getPassword())
+                    .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+            return ResponseEntity.status(HttpStatus.OK).body(buyer);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
     }
 
-
+    @PostMapping("/buyerRegister")
+    public ResponseEntity<Buyer> buyerRegister(@RequestBody RegisterDto registerDto) {
+        if (buyerDao.existsByEmail(registerDto.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        Buyer buyer = new Buyer();
+        BeanUtils.copyProperties(registerDto, buyer);
+        buyerDao.save(buyer);
+        return ResponseEntity.status(HttpStatus.OK).body(buyer);
+    }
 
     @PostMapping("buyer")
-    public ResponseEntity<Buyer> createBuyer(@RequestBody Buyer buyer){
+    public ResponseEntity<Buyer> createBuyer(@RequestBody Buyer buyer) {
         buyerDao.save(buyer);
         return ResponseEntity.ok(buyer);
     }
 
     @GetMapping("buyer")
-    public ResponseEntity<List<Buyer>>  getAllBuyer(){
-        List<Buyer> buyerList=buyerDao.findAll();
+    public ResponseEntity<List<Buyer>> getAllBuyer() {
+        List<Buyer> buyerList = buyerDao.findAll();
         return ResponseEntity.ok(buyerList);
 
     }
+
     @PutMapping("buyer/{id}")
-    public ResponseEntity<Buyer> updateBuyer(@RequestBody Buyer buyer, @PathVariable Long id){
-        Buyer exBuyer=buyerDao.findById(id)
-                .orElseThrow(()->new RuntimeException("no buyer found"));
+    public ResponseEntity<Buyer> updateBuyer(@RequestBody Buyer buyer, @PathVariable Long id) {
+        Buyer exBuyer = buyerDao.findById(id)
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
         exBuyer.setAddress(buyer.getAddress());
         exBuyer.setName(buyer.getName());
         exBuyer.setPhone(buyer.getPhone());
         exBuyer.setEmail(buyer.getEmail());
-    exBuyer.setPassword(buyer.getPassword());
-    buyerDao.save(exBuyer);
-    return
-ResponseEntity.ok(exBuyer);
+        exBuyer.setPassword(buyer.getPassword());
+        buyerDao.save(exBuyer);
+        return
+                ResponseEntity.ok(exBuyer);
     }
 
     @DeleteMapping("buyer/{id}")
-    public ResponseEntity<Buyer> deleteBuyer(@PathVariable Long id){
-        Buyer exBuyer=buyerDao.findById(id)
-                .orElseThrow(()->new RuntimeException("no buyer found"));
+    public ResponseEntity<Buyer> deleteBuyer(@PathVariable Long id) {
+        Buyer exBuyer = buyerDao.findById(id)
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
         buyerDao.deleteById(id);
         return ResponseEntity.ok(exBuyer);
     }
 
-    public ResponseEntity<Discount> createDiscount(@RequestBody DiscountDto discountDto){
-        Buyer buyer=buyerDao.findById(discountDto.getBuyer_id())
-                .orElseThrow(()->new RuntimeException("no buyer found"));
-        Discount discount=new Discount();
+    public ResponseEntity<Discount> createDiscount(@RequestBody DiscountDto discountDto) {
+        Buyer buyer = buyerDao.findById(discountDto.getBuyer_id())
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
+        Discount discount = new Discount();
         discount.setBuyer(buyer);
         discount.setDiscount_percent(discount.getDiscount_percent());
         discount.setOrder_count(discount.getOrder_count());
@@ -105,51 +123,45 @@ ResponseEntity.ok(exBuyer);
     }
 
     @PostMapping("farmer")
-    public ResponseEntity<Farmer> createFarmer(@RequestBody Farmer farmer){
+    public ResponseEntity<Farmer> createFarmer(@RequestBody Farmer farmer) {
         farmerDao.save(farmer);
         return ResponseEntity.ok(farmer);
     }
 
     @GetMapping("farmer")
-    public ResponseEntity<List<Farmer>> getAllFarmers(){
-        List<Farmer> farmerList =farmerDao.findAll();
+    public ResponseEntity<List<Farmer>> getAllFarmers() {
+        List<Farmer> farmerList = farmerDao.findAll();
         return ResponseEntity.ok(farmerList);
     }
 
     @GetMapping("farmer/{id}")
-    public ResponseEntity<Farmer> getFarmerById(@PathVariable Long id){
-        Farmer farmer=farmerDao.findById(id).orElseThrow(()->new RuntimeException("no user found"));
+    public ResponseEntity<Farmer> getFarmerById(@PathVariable Long id) {
+        Farmer farmer = farmerDao.findById(id).orElseThrow(() -> new RuntimeException("no user found"));
         System.out.println(farmer);
         return ResponseEntity.ok(farmer);
     }
 
 
     @PutMapping("farmer/{id}")
-    public ResponseEntity<Farmer> updateFarmer(@RequestBody Farmer farmer,@PathVariable Long id){
-        Farmer farmer1=farmerDao.findById(id)
-                .orElseThrow(()->new RuntimeException("no farmer found"));
+    public ResponseEntity<Farmer> updateFarmer(@RequestBody Farmer farmer, @PathVariable Long id) {
+        Farmer farmer1 = farmerDao.findById(id)
+                .orElseThrow(() -> new RuntimeException("no farmer found"));
         farmer1.setAddress(farmer.getAddress());
         farmer1.setName(farmer.getName());
         farmer1.setPhone(farmer.getPhone());
         farmer1.setEmail(farmer.getEmail());
         farmer1.setPassword(farmer.getPassword());
         farmerDao.save(farmer1);
-        return  ResponseEntity.ok(farmer1);
-    }
-
-    @DeleteMapping("farmer/{id}")
-    public ResponseEntity<Farmer> deleteFarmer(@PathVariable Long id){
-        Farmer farmer1=farmerDao.findById(id)
-                .orElseThrow(()->new RuntimeException("no farmer found"));
-        farmerDao.deleteById(id);
         return ResponseEntity.ok(farmer1);
     }
 
-
-
-
-
-
+    @DeleteMapping("farmer/{id}")
+    public ResponseEntity<Farmer> deleteFarmer(@PathVariable Long id) {
+        Farmer farmer1 = farmerDao.findById(id)
+                .orElseThrow(() -> new RuntimeException("no farmer found"));
+        farmerDao.deleteById(id);
+        return ResponseEntity.ok(farmer1);
+    }
 
 
     @PostMapping("inventory")
@@ -202,8 +214,9 @@ ResponseEntity.ok(exBuyer);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Farmer not found: " + e.getMessage());
         }
     }
+
     @PutMapping("fInventory/{id}")
-    public ResponseEntity<String> fUpdateInventory(@RequestParam("file") MultipartFile file, @RequestParam("data") String inventoryData,@PathVariable Long id) {
+    public ResponseEntity<String> fUpdateInventory(@RequestParam("file") MultipartFile file, @RequestParam("data") String inventoryData, @PathVariable Long id) {
         System.out.println("Hit inventory upload");
 
         try {
@@ -227,7 +240,7 @@ ResponseEntity.ok(exBuyer);
 
 //            Farmer farmer = farmerDao.findById(inventoryRequestDto.getFarmerId()).orElseThrow(() -> new RuntimeException("Farmer not found"));
 
-            Inventory inventorySaved = inventoryDao.findById(id).orElseThrow(()->new RuntimeException("No inventory found"));
+            Inventory inventorySaved = inventoryDao.findById(id).orElseThrow(() -> new RuntimeException("No inventory found"));
             inventorySaved.setName(originalImgname);
             inventorySaved.setDescription(inventoryRequestDto.getDescription());
             inventorySaved.setCategory(inventoryRequestDto.getCategory());
@@ -253,13 +266,12 @@ ResponseEntity.ok(exBuyer);
     }
 
     @PutMapping("bInventory/{id}")
-    public ResponseEntity<Inventory> updateWeight (@RequestBody InventoryDto inventoryDto,@PathVariable Long id){
-        Inventory inventory=inventoryDao.findById(id).orElseThrow(()->new RuntimeException("no inventory found"));
+    public ResponseEntity<Inventory> updateWeight(@RequestBody InventoryDto inventoryDto, @PathVariable Long id) {
+        Inventory inventory = inventoryDao.findById(id).orElseThrow(() -> new RuntimeException("no inventory found"));
         inventory.setRemaining_weight(inventoryDto.getRemaining_weight());
         inventoryDao.save(inventory);
         return ResponseEntity.ok(inventory);
     }
-
 
 
     @GetMapping("inventory")
@@ -284,7 +296,7 @@ ResponseEntity.ok(exBuyer);
     }
 
     @GetMapping("fInventory/{id}")
-    public ResponseEntity<List<InventoryDto>> getAllInventoriesByFarmerId(@PathVariable Long id){
+    public ResponseEntity<List<InventoryDto>> getAllInventoriesByFarmerId(@PathVariable Long id) {
         List<Inventory> inventoryList = inventoryDao.findAllByFarmerId(id);
         List<InventoryDto> inventoryDtoList = inventoryList.stream().map(inventory -> {
             InventoryDto dto = new InventoryDto();
@@ -304,12 +316,11 @@ ResponseEntity.ok(exBuyer);
     }
 
 
-
     @GetMapping("inventory/{id}")
     public ResponseEntity<InventoryDto> getInventoryById(@PathVariable Long id) {
         Inventory inventory = inventoryDao.findById(id)
                 .orElseThrow(() -> new RuntimeException("Inventory not found"));
-        InventoryDto inventoryDto=new InventoryDto();
+        InventoryDto inventoryDto = new InventoryDto();
         inventoryDto.setName(inventory.getName());
         inventoryDto.setId(inventory.getId());
         inventoryDto.setFarmer_id(inventory.getFarmer().getId());
@@ -327,23 +338,24 @@ ResponseEntity.ok(exBuyer);
     public ResponseEntity<Inventory> deleteInventory(@PathVariable Long id) {
         Inventory inventory = inventoryDao.findById(id)
                 .orElseThrow(() -> new RuntimeException("Inventory not found"));
-        List<Order> orders=orderDao.findAllByInventoryId(id);
+        List<Order> orders = orderDao.findAllByInventoryId(id);
 
-for (Order order:orders){
-    Long i=order.getId();
-    List<Payment> payments =paymentDao.findAllByOrderId(i);
-    paymentDao.deleteAll(payments);
-}orderDao.deleteAll(orders);
+        for (Order order : orders) {
+            Long i = order.getId();
+            List<Payment> payments = paymentDao.findAllByOrderId(i);
+            paymentDao.deleteAll(payments);
+        }
+        orderDao.deleteAll(orders);
         inventoryDao.deleteById(id);
         return ResponseEntity.ok(inventory);
     }
 
     @PostMapping("orders")
-    public ResponseEntity<Order> createOrder(@RequestBody OrderDto orderDto){
-        Buyer buyer=buyerDao.findById(orderDto.getBuyer_id())
-                .orElseThrow(()->new RuntimeException("no buyer found"));
-        Farmer farmer=farmerDao.findById(orderDto.getFarmer_id())
-                .orElseThrow(()->new RuntimeException("no farmer found"));
+    public ResponseEntity<Order> createOrder(@RequestBody OrderDto orderDto) {
+        Buyer buyer = buyerDao.findById(orderDto.getBuyer_id())
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
+        Farmer farmer = farmerDao.findById(orderDto.getFarmer_id())
+                .orElseThrow(() -> new RuntimeException("no farmer found"));
         Inventory inventory = inventoryDao.findById(orderDto.getInventory_id())
                 .orElseThrow(() -> new RuntimeException("Inventory not found"));
         Order order = new Order();
@@ -393,8 +405,8 @@ for (Order order:orders){
     }
 
     @GetMapping("fOrders/{id}")
-    public ResponseEntity<List<OrderDto>> getAllOrdersByFarmerId(@PathVariable Long id){
-        List<Order> orders=orderDao.findAllByFarmerId(id);
+    public ResponseEntity<List<OrderDto>> getAllOrdersByFarmerId(@PathVariable Long id) {
+        List<Order> orders = orderDao.findAllByFarmerId(id);
         List<OrderDto> orderDtos = orders.stream().map(order -> {
             OrderDto dto = new OrderDto();
             dto.setId(order.getId());
@@ -421,9 +433,10 @@ for (Order order:orders){
         return ResponseEntity.ok(orderDtos);
 
     }
+
     @GetMapping("bOrders/{id}")
-    public ResponseEntity<List<OrderDto>> getAllOrdersByBuyerId(@PathVariable Long id){
-        List<Order> orders=orderDao.findAllByBuyerId(id);
+    public ResponseEntity<List<OrderDto>> getAllOrdersByBuyerId(@PathVariable Long id) {
+        List<Order> orders = orderDao.findAllByBuyerId(id);
         System.out.println("Received request for buyerId: " + id);
 
         List<OrderDto> orderDtos = orders.stream().map(order -> {
@@ -459,10 +472,10 @@ for (Order order:orders){
         Inventory inventory = inventoryDao.findById(id)
                 .orElseThrow(() -> new RuntimeException("Inventory not found"));
 
-        Buyer buyer=buyerDao.findById(orderDto.getBuyer_id())
-                .orElseThrow(()->new RuntimeException("no buyer found"));
-        Farmer farmer=farmerDao.findById(orderDto.getFarmer_id())
-                .orElseThrow(()->new RuntimeException("no farmer found"));
+        Buyer buyer = buyerDao.findById(orderDto.getBuyer_id())
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
+        Farmer farmer = farmerDao.findById(orderDto.getFarmer_id())
+                .orElseThrow(() -> new RuntimeException("no farmer found"));
         Order order = orderDao.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setFarmer(farmer);
@@ -482,8 +495,6 @@ for (Order order:orders){
     }
 
 
-
-
     @DeleteMapping("orders/{id}")
     public ResponseEntity<Order> deleteOrder(@PathVariable Long id) {
         Order existingOrder = orderDao.findById(id)
@@ -494,15 +505,15 @@ for (Order order:orders){
 
 
     @PostMapping("payment")
-    public ResponseEntity<PaymentDto> createPayment(@RequestBody PaymentDto paymentDto){
+    public ResponseEntity<PaymentDto> createPayment(@RequestBody PaymentDto paymentDto) {
 
-        Buyer buyer=buyerDao.findById(paymentDto.getBuyer_id())
-                .orElseThrow(()->new RuntimeException("no buyer found"));
-        Farmer farmer=farmerDao.findById(paymentDto.getFarmer_id())
-                .orElseThrow(()->new RuntimeException("no farmer found"));
-        Order order=orderDao.findById(paymentDto.getOrder_id())
-                .orElseThrow(()->new RuntimeException("no order found"));
-        Payment payment=new Payment();
+        Buyer buyer = buyerDao.findById(paymentDto.getBuyer_id())
+                .orElseThrow(() -> new RuntimeException("no buyer found"));
+        Farmer farmer = farmerDao.findById(paymentDto.getFarmer_id())
+                .orElseThrow(() -> new RuntimeException("no farmer found"));
+        Order order = orderDao.findById(paymentDto.getOrder_id())
+                .orElseThrow(() -> new RuntimeException("no order found"));
+        Payment payment = new Payment();
         payment.setBuyer(buyer);
         payment.setFarmer(farmer);
         payment.setOrder(order);
@@ -517,12 +528,11 @@ for (Order order:orders){
     }
 
 
-
     @GetMapping("fPayment/{id}")
-    public ResponseEntity<List<PaymentDto>> getAllPaymentsByFarmerId(@PathVariable Long id){
-        List<Payment> payments=paymentDao.findAllByFarmerId(id);
-        List<PaymentDto> paymentDtos=payments.stream().map(payment -> {
-            PaymentDto paymentDto=new PaymentDto();
+    public ResponseEntity<List<PaymentDto>> getAllPaymentsByFarmerId(@PathVariable Long id) {
+        List<Payment> payments = paymentDao.findAllByFarmerId(id);
+        List<PaymentDto> paymentDtos = payments.stream().map(payment -> {
+            PaymentDto paymentDto = new PaymentDto();
             paymentDto.setOrder_id(payment.getOrder().getId());
             paymentDto.setBuyer_id(payment.getBuyer().getId());
             paymentDto.setFarmer_id(payment.getFarmer().getId());
@@ -536,14 +546,14 @@ for (Order order:orders){
             paymentDto.setPayment_amount(payment.getPayment_amount());
             return paymentDto;
         }).collect(Collectors.toList());
-    return ResponseEntity.ok(paymentDtos);
+        return ResponseEntity.ok(paymentDtos);
     }
 
     @GetMapping("bPayment/{id}")
-    public ResponseEntity<List<PaymentDto>> getAllPaymentsByBuyerId(@PathVariable Long id){
-        List<Payment> payments=paymentDao.findAllByBuyerId(id);
-        List<PaymentDto> paymentDtos=payments.stream().map(payment -> {
-            PaymentDto paymentDto=new PaymentDto();
+    public ResponseEntity<List<PaymentDto>> getAllPaymentsByBuyerId(@PathVariable Long id) {
+        List<Payment> payments = paymentDao.findAllByBuyerId(id);
+        List<PaymentDto> paymentDtos = payments.stream().map(payment -> {
+            PaymentDto paymentDto = new PaymentDto();
             paymentDto.setOrder_id(payment.getOrder().getId());
             paymentDto.setBuyer_id(payment.getBuyer().getId());
             paymentDto.setFarmer_id(payment.getFarmer().getId());
@@ -560,10 +570,10 @@ for (Order order:orders){
     }
 
     @GetMapping("payment")
-    public ResponseEntity<List<PaymentDto>> getAllPayments(){
-        List<Payment> payments=paymentDao.findAll();
-        List<PaymentDto> paymentDtos=payments.stream().map(payment -> {
-            PaymentDto paymentDto=new PaymentDto();
+    public ResponseEntity<List<PaymentDto>> getAllPayments() {
+        List<Payment> payments = paymentDao.findAll();
+        List<PaymentDto> paymentDtos = payments.stream().map(payment -> {
+            PaymentDto paymentDto = new PaymentDto();
             paymentDto.setOrder_id(payment.getOrder().getId());
             paymentDto.setBuyer_id(payment.getBuyer().getId());
             paymentDto.setFarmer_id(payment.getFarmer().getId());
@@ -579,9 +589,6 @@ for (Order order:orders){
         return ResponseEntity.ok(paymentDtos);
 
     }
-
-
-
 
 
 }

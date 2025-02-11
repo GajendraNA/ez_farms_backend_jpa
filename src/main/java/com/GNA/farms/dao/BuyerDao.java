@@ -11,5 +11,5 @@ import java.util.Optional;
 public interface BuyerDao extends JpaRepository<Buyer,Long> {
     Optional<Buyer> findByEmailAndPassword(String email, String password);
 
-
+    boolean existsByEmail(String email);
 }

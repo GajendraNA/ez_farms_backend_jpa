@@ -7,8 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-
 public interface FarmerDao extends JpaRepository<Farmer,Long> {
     Optional<Farmer> findByEmailAndPassword(String email, String password);
-
 }
